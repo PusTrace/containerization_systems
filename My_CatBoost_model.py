@@ -42,17 +42,18 @@ model = CatBoostClassifier(
 
 # 4. Простая Randomized Search
 param_distributions = {
-    'depth': [4, 6, 8, 10],
-    'learning_rate': [0.01, 0.05, 0.1, 0.2],
-    'l2_leaf_reg': [1, 3, 5, 7, 9],
-    'iterations': [500, 1000, 1500],
+    'depth': [4, 6, 8],  # без 10 — глубокие деревья + high lr = плохо
+    'learning_rate': [0.01, 0.03, 0.05],  # избегаем 0.1 и выше на первом этапе
+    'l2_leaf_reg': [5, 7, 9, 15, 20],  # повысим регуляризацию
+    'iterations': [500, 700, 1000],  # чтобы не было слишком долго
     'border_count': [32, 50, 100]
 }
+
 
 random_search_result = model.randomized_search(
     param_distributions,
     train_pool,
-    n_iter=20,
+    n_iter=10,
     cv=3,
     stratified=True,
     refit=True,
