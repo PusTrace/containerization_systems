@@ -1,72 +1,35 @@
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score
-)
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# 1. Загрузка данных
-df = pd.read_csv('balanced_output.csv')
-df = df.drop(columns=['Flow ID'])
+# 1. Загрузка данных с sep=';'
+train_df = pd.read_csv('train.csv', sep=';')
+val_df = pd.read_csv('valid.csv', sep=';')
+test_df = pd.read_csv('test_data.csv', sep=';')
 
-X = df.drop(columns=['Label'])
-y = df['Label']
+# Удаляем лишний столбец, если он есть, например Flow ID
+for df in [train_df, val_df, test_df]:
+    if 'Flow ID' in df.columns:
+        df.drop(columns=['Flow ID'], inplace=True)
 
-# 2. Разделение на train/val/test (70/10/20)
-X_temp, X_test, y_temp, y_test = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42
-)
-X_train, X_val, y_train, y_val = train_test_split(
-    X_temp, y_temp, test_size=0.125, stratify=y_temp, random_state=42
-)
+# 2. Разделяем признаки и метки
+X_train = train_df.drop(columns=['Label'])
+y_train = train_df['Label']
 
+X_val = val_df.drop(columns=['Label'])
+y_val = val_df['Label']
+
+X_test = test_df.drop(columns=['Label'])
+y_test = test_df['Label']
+
+# 3. Создаем объекты Pool
 train_pool = Pool(X_train, y_train)
 val_pool = Pool(X_val, y_val)
 
-# 3. Инициализация модели для Randomized Search с GPU
+# 4. Инициализация модели CatBoost (пример без Randomized Search, для теста)
 model = CatBoostClassifier(
-    loss_function='MultiClass',
-    eval_metric='MultiClass',
-    task_type='GPU',
-    devices='0',  # номер GPU, обычно 0
-    random_state=42,
-    verbose=0
-)
-
-# 4. Простая Randomized Search
-param_distributions = {
-    'depth': [4, 6, 8],  # без 10 — глубокие деревья + high lr = плохо
-    'learning_rate': [0.01, 0.03, 0.05],  # избегаем 0.1 и выше на первом этапе
-    'l2_leaf_reg': [5, 7, 9, 15, 20],  # повысим регуляризацию
-    'iterations': [500, 700, 1000],  # чтобы не было слишком долго
-    'border_count': [32, 50, 100]
-}
-
-
-random_search_result = model.randomized_search(
-    param_distributions,
-    train_pool,
-    n_iter=10,
-    cv=3,
-    stratified=True,
-    refit=True,
-    plot=False,
-    verbose=True
-)
-
-best_params = random_search_result['params']
-print("Лучшие параметры:", best_params)
-
-# 5. Обучение финальной модели с лучшими параметрами
-final_model = CatBoostClassifier(
-    **best_params,
     loss_function='MultiClass',
     eval_metric='MultiClass',
     task_type='GPU',
@@ -75,19 +38,18 @@ final_model = CatBoostClassifier(
     verbose=10
 )
 
-final_model.fit(
+# 5. Обучение с использованием валидационного сета
+model.fit(
     train_pool,
     eval_set=val_pool,
     use_best_model=True,
     early_stopping_rounds=50
 )
 
-# 6. Сохранение модели
-final_model.save_model("model.cbm")
+# 6. Предсказания на тестовом сете
+y_pred = model.predict(X_test).flatten()
 
-# 7. Предсказание и метрики
-y_pred = final_model.predict(X_test).flatten()
-
+# 7. Метрики
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("Precision (macro):", precision_score(y_test, y_pred, average='macro'))
 print("Recall (macro):", recall_score(y_test, y_pred, average='macro'))

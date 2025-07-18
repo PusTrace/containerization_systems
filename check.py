@@ -1,6 +1,6 @@
 import pandas as pd
 
-data = pd.read_csv('balanced_output.csv')
+data = pd.read_csv('test_data.csv', sep=';')
 print(data.shape)       # (строки, колонки)
 print(data.columns)     # список всех колонок
 print(data.head(5))     # первые 5 строк, чтобы прикинуть структуру
