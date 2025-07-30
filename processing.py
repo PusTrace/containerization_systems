@@ -21,11 +21,11 @@ print(data.columns.tolist())
 flow_id = data['Flow ID']
 labels = data['Label']
 
-# Удаляем признаки, связанные со стендом
-X = data.drop(['Flow ID', 'Src Port', 'Src IP', 'Dst IP', 'Dst Port', 'Protocol', 'Timestamp', 'Label'], axis=1)
-
+X = data.select_dtypes(include=[np.number])
 # Заменяем бесконечные и NaN значения на 0
-X = X.replace([np.inf, -np.inf], 0).fillna(0)
+X = X.replace([np.inf, -np.inf], np.nan)
+X = X.fillna(X.median())  # медианное заполнение
+
 
 # Фильтрация признаков с низкой дисперсией
 selector = VarianceThreshold(threshold=0.01)
