@@ -1,16 +1,29 @@
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from sdv.single_table import CTGANSynthesizer
-from sdv.metadata import SingleTableMetadata
+from sdv.metadata import SingleTableMetadata, Metadata  # <-- обновленный класс
 
 # Загружаем данные
 balanced_data = pd.read_csv('balanced_output.csv')
 
 # Убираем нормальный трафик
-balanced_data = balanced_data[balanced_data['label'] != 0].reset_index(drop=True)
+balanced_data = balanced_data[balanced_data['Label'] != 0].reset_index(drop=True)
 
-# Объединяем редкие классы в "other"
-balanced_data['Label'] = balanced_data['Label'].replace({10: 99, 5: 99, 9: 99})
+magority_classes = [1, 2, 11]
+for cls in magority_classes:
+    # Разделение нормального трафика и атак
+    target_traffic = balanced_data[balanced_data['Label'] == cls]
+    other = balanced_data[balanced_data['Label'] != cls]
+
+    # Ограничиваем нормальный трафик
+    normal_sampled = target_traffic.sample(n=2000, random_state=42)
+
+    # Склеиваем обратно и перемешиваем
+    balanced_data = pd.concat([normal_sampled, other], axis=0)
+    balanced_data = balanced_data.sample(frac=1, random_state=42).reset_index(drop=True)
+
+# удаляем минорные классы
+balanced_data = balanced_data[~balanced_data['Label'].isin([10,5,9])]
 
 # Разделение X/y
 X = balanced_data.drop(columns=['Label'])
@@ -34,19 +47,29 @@ X_test.to_csv('gan_smote/test.csv', index=False)
 train_df = X_train.copy()
 train_df['Label'] = y_train
 
-# Классы для GAN
-target_classes = [8, 6, 3, 4, 7, 99, 11]
+# Классы для GAN (исключаем очень редкие и мажоритные)
+target_classes = [8, 6, 3, 4, 7, 11]
 
-# Определяем сколько нужно сгенерировать для баланса
+# Максимальный размер для синтетики на класс — ограничиваем, например 10_000
+MAX_SYNTHETIC_SAMPLES = 1000
+
+# Подсчет сколько генерировать для каждого класса
 max_count = train_df['Label'].value_counts().max()
-target_counts = {cls: max_count - len(train_df[train_df['Label'] == cls])
-                 for cls in target_classes if cls in train_df['Label'].unique()}
+target_counts = {}
+for cls in target_classes:
+    if cls in train_df['Label'].unique():
+        current_count = len(train_df[train_df['Label'] == cls])
+        needed = max_count - current_count
+        # Ограничиваем максимум генерации
+        gen_count = min(needed, MAX_SYNTHETIC_SAMPLES) if needed > 0 else 0
+        target_counts[cls] = gen_count
 
-# Метаинформация для CTGAN
-metadata = SingleTableMetadata()
+# Используем новый Metadata класс
+metadata = Metadata()
 metadata.detect_from_dataframe(data=train_df)
 
 augmented_frames = []
+
 
 for label_value, gen_count in target_counts.items():
     df_class = train_df[train_df['Label'] == label_value]
@@ -54,8 +77,14 @@ for label_value, gen_count in target_counts.items():
     if len(df_class) < 50:
         print(f"Пропускаем класс {label_value}, мало данных ({len(df_class)})")
         continue
+    if gen_count == 0:
+        print(f"Класс {label_value} уже сбалансирован или превышен, генерировать не нужно")
+        continue
 
     print(f"Обучаем CTGAN для класса {label_value} ({len(df_class)} реальных), генерируем {gen_count}")
+
+    metadata = SingleTableMetadata()
+    metadata.detect_from_dataframe(data=df_class)
 
     synthesizer = CTGANSynthesizer(metadata)
     synthesizer.fit(df_class)
@@ -63,15 +92,16 @@ for label_value, gen_count in target_counts.items():
     new_samples = synthesizer.sample(num_rows=gen_count)
     augmented_frames.append(new_samples)
 
-# Объединяем всё
+
+# Объединяем все синтетические данные с оригинальным train
 if augmented_frames:
     gan_data = pd.concat(augmented_frames, ignore_index=True)
     new_train = pd.concat([train_df, gan_data], ignore_index=True)
 else:
     new_train = train_df
 
-# Сохраняем итог
-new_train.to_csv('gan_smote/gan_augmented_train.csv', index=False)
-
 print("Размер нового train:", new_train.shape)
 print(new_train['Label'].value_counts())
+
+# Сохраняем итог
+new_train.to_csv('gan_smote/gan_augmented_train.csv', index=False)

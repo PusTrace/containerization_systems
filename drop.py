@@ -40,11 +40,10 @@ cols_to_drop = [
     # Дубли по bulk уже есть выше, так что их второй раз можно не писать
 ]
 
-
-
 # Удаление только тех колонок, которые реально есть
 existing_cols = [c for c in cols_to_drop if c in data.columns]
 data.drop(columns=existing_cols, inplace=True)
+
 
 # Разделение нормального трафика и атак
 normal_traffic = data[data['Label'] == 0]
