@@ -9,7 +9,6 @@ def check_column_existence(data):
     print(data.head(5))     # первые 5 строк, чтобы прикинуть структуру
     print(data.info())      # инфо о типах данных и пропусках
     print(data['Label'].value_counts())
-    print(data.isnull().sum())  # сколько пропущенных значений в каждом столбце
 
 
 def plot_label_distribution(data):
@@ -51,8 +50,12 @@ def plot_zero_ratio_by_column(data, top_n=None):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv('output.csv', sep=',')
-    
-    ratios = plot_zero_ratio_by_column(data, top_n=20)
-    print(ratios)
+    bout = 'balanced_output.csv'
+    out = 'output.csv'
+
+    data = pd.read_csv('gan_smote/gan_augmented_train.csv', sep=',')
+    check_column_existence(data)
+    plot_label_distribution(data)
+    # ratios = plot_zero_ratio_by_column(data, top_n=20)
+    # print(ratios)
 

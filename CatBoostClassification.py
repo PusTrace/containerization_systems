@@ -3,16 +3,14 @@ from catboost import CatBoostClassifier, Pool
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.utils import compute_class_weight
+import numpy as np
 
 # 1. Загрузка данных с sep=';'
-train_df = pd.read_csv('train.csv', sep=';')
-val_df = pd.read_csv('valid.csv', sep=';')
-test_df = pd.read_csv('test_data.csv', sep=';')
+train_df = pd.read_csv('gan_smote/gan_augmented_train.csv', sep=',')
+val_df = pd.read_csv('gan_smote/validation.csv', sep=',')
+test_df = pd.read_csv('gan_smote/test.csv', sep=',')
 
-# Удаляем лишний столбец, если он есть, например Flow ID
-for df in [train_df, val_df, test_df]:
-    if 'Flow ID' in df.columns:
-        df.drop(columns=['Flow ID'], inplace=True)
 
 # 2. Разделяем признаки и метки
 X_train = train_df.drop(columns=['Label'])
@@ -26,6 +24,26 @@ y_test = test_df['Label']
 
 # 3. Создаем объекты Pool
 train_pool = Pool(X_train, y_train)
+val_pool = Pool(X_val, y_val)
+
+
+# 3. Вычисляем веса классов
+class_weights = compute_class_weight(
+    class_weight='balanced',
+    classes=np.unique(y_train),
+    y=y_train
+)
+
+# Преобразуем список весов в словарь, который нужен для CatBoost
+class_weights_dict = {i: weight for i, weight in enumerate(class_weights)}
+
+# Увеличиваем вес классов 3-11 в два раза
+for class_label in range(3, 12):
+    if class_label in class_weights_dict:
+        class_weights_dict[class_label] *= 2  # Увеличиваем вес класса в 2 раз
+
+# 4. Создаем объекты Pool с указанием весов
+train_pool = Pool(X_train, y_train, weight=[class_weights_dict[label] for label in y_train])
 val_pool = Pool(X_val, y_val)
 
 # 4. Инициализация модели CatBoost (пример без Randomized Search, для теста)

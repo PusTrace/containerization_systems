@@ -1,2 +1,4 @@
 *.csv
 */*.csv
+catboost_info/*
+catboost_info
