@@ -4,12 +4,14 @@ from sdv.single_table import CTGANSynthesizer
 from sdv.metadata import SingleTableMetadata, Metadata  # <-- обновленный класс
 
 # Загружаем данные
-balanced_data = pd.read_csv('balanced_output.csv')
+data = pd.read_csv('output.csv')
+
+balanced_data = data.drop(columns=["Flow ID"])
+
 
 # Убираем нормальный трафик
-balanced_data = balanced_data[balanced_data['Label'] != 0].reset_index(drop=True)
 
-magority_classes = [1, 2, 11]
+magority_classes = [0, 1, 2, 11]
 for cls in magority_classes:
     # Разделение нормального трафика и атак
     target_traffic = balanced_data[balanced_data['Label'] == cls]
@@ -23,7 +25,7 @@ for cls in magority_classes:
     balanced_data = balanced_data.sample(frac=1, random_state=42).reset_index(drop=True)
 
 # удаляем минорные классы
-balanced_data = balanced_data[~balanced_data['Label'].isin([10,5,9])]
+# balanced_data = balanced_data[~balanced_data['Label'].isin([10,5,9])]
 
 # Разделение X/y
 X = balanced_data.drop(columns=['Label'])
@@ -40,17 +42,17 @@ X_train, X_val, y_train, y_val = train_test_split(
 # Сохраняем валидацию и тест
 X_val['Label'] = y_val
 X_test['Label'] = y_test
-X_val.to_csv('gan_smote/validation.csv', index=False)
-X_test.to_csv('gan_smote/test.csv', index=False)
+X_val.to_csv('datasets/validation.csv', index=False)
+X_test.to_csv('datasets/test.csv', index=False)
 
 # Создаем train_df
 train_df = X_train.copy()
 train_df['Label'] = y_train
 
 # Классы для GAN (исключаем очень редкие и мажоритные)
-target_classes = [8, 6, 3, 4, 7, 11]
+target_classes = [3, 4, 5, 6, 7, 8, 9, 10]  # <-- классы для генерации
 
-# Максимальный размер для синтетики на класс — ограничиваем, например 10_000
+# Максимальный размер для синтетики на класс — ограничиваем, например 1000
 MAX_SYNTHETIC_SAMPLES = 1000
 
 # Подсчет сколько генерировать для каждого класса
@@ -104,4 +106,4 @@ print("Размер нового train:", new_train.shape)
 print(new_train['Label'].value_counts())
 
 # Сохраняем итог
-new_train.to_csv('gan_smote/gan_augmented_train.csv', index=False)
+new_train.to_csv('datasets/gan_augmented_train.csv', index=False)

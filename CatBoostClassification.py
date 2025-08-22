@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # 1. Загрузка данных с sep=';'
-train_df = pd.read_csv('gan_smote/gan_augmented_train.csv', sep=',')
-val_df = pd.read_csv('gan_smote/validation.csv', sep=',')
-test_df = pd.read_csv('gan_smote/test.csv', sep=',')
+train_df = pd.read_csv('datasets/gan_augmented_train.csv', sep=',')
+val_df = pd.read_csv('datasets/validation.csv', sep=',')
+test_df = pd.read_csv('datasets/test.csv', sep=',')
 
 # 2. Разделяем признаки и метки
 X_train = train_df.drop(columns=['Label'])
@@ -23,16 +23,7 @@ y_test = test_df['Label']
 train_pool = Pool(X_train, y_train)
 val_pool = Pool(X_val, y_val)
 
-# 4. Инициализация модели CatBoost (пример без Randomized Search, для теста)
-
-class_weights = {
-    1: 0.43,
-    2: 0.43,
-    3: 1.8,
-    6: 1.8,
-    8: 1.8,
-    11: 0.43
-}
+# 4. Инициализация модели CatBoost (пример без Randomized Search)
 
 model = CatBoostClassifier(
     loss_function='MultiClass',
@@ -40,11 +31,8 @@ model = CatBoostClassifier(
     task_type='GPU',
     devices='0',
     random_state=42,
-    class_weights=class_weights,
     verbose=10
 )
-
-
 
 # 5. Обучение с использованием валидационного сета
 model.fit(
